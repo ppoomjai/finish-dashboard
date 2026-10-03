@@ -14,7 +14,8 @@
     excluded: new Set(), // channels unticked in Data sources
     sourcesOpen: false, // Data sources grid expanded
     txs: [],            // every transaction, with .month
-    period: ALL,        // always opens on All months
+    year: ALL,          // "YYYY" or ALL; opens on All
+    period: ALL,        // a month "YYYY-MM" within the year, or ALL
     category: ALL,
     limit: PAGE,
     catsOpen: { expense: false, income: false }, // show every category, not just the top ones
@@ -105,7 +106,9 @@
 
   const isOn = (channel) => !state.excluded.has(channel);
   const inChannel = (tx) => isOn(tx.channel);
-  const inPeriod = (tx) => state.period === ALL || tx.month === state.period;
+  const inYear = (m) => state.year === ALL || m.startsWith(state.year);
+  const inPeriod = (tx) => state.period === ALL ? inYear(tx.month) : tx.month === state.period;
+  const visibleMonths = () => state.months.filter(inYear);
   const monthSummary = (m) => summarize(state.txs.filter((tx) => tx.month === m && inChannel(tx)));
 
   // Selected channels with no rows in this month although they have rows both before and
@@ -121,7 +124,7 @@
   }
   const isEmpty = (month) => !state.txs.some((tx) => tx.month === month && inChannel(tx));
   const missingText = (month) => isEmpty(month) ? "no data" : "missing " + missingChannels(month).join(", ");
-  const monthsWithData = () => state.months.filter((m) => !isEmpty(m));
+  const monthsWithData = () => visibleMonths().filter((m) => !isEmpty(m));
 
   // ---------- render ----------
 
@@ -149,9 +152,11 @@
     update();
   }
 
+  const years = () => [...new Set(state.months.map((m) => m.slice(0, 4)))].sort();
+
   function renderPeriods() {
     const nav = $("periods");
-    const items = [[ALL, "All"], ...[...state.months].reverse().map((m) => [m, monthLabel(m, m.slice(0, 4) !== String(new Date().getFullYear()))])];
+    const items = [[ALL, "All"], ...visibleMonths().map((m) => [m, monthLabel(m, state.year === ALL && years().length > 1)])];
     nav.innerHTML = items.map(([m, label]) =>
       `<button data-m="${m}" class="${m === state.period ? "on" : ""}" aria-pressed="${m === state.period}"` +
       `${m && missingChannels(m).length ? ` title="${esc(missingText(m))}"` : ""}>${label}` +
@@ -161,7 +166,8 @@
 
   function renderOverview(s) {
     const net = s.income - s.expense;
-    $("hero-label").textContent = "Net · " + (state.period === ALL ? "All months" : monthLabel(state.period, true));
+    $("hero-label").textContent = "Net · " +
+      (state.period !== ALL ? monthLabel(state.period, true) : state.year === ALL ? "All time" : state.year);
     $("sum-net").textContent = baht(net);
     $("sum-net").classList.toggle("neg", net < 0);
     $("sum-income").textContent = baht(s.income);
@@ -182,7 +188,7 @@
     warn.hidden = !s.unknownCount;
     warn.textContent = `⚠ ${s.unknownCount} transaction(s) have no known category (${baht(s.unknown, 2)}), not counted in totals.`;
 
-    const partial = (state.period === ALL ? state.months : [state.period])
+    const partial = (state.period === ALL ? visibleMonths() : [state.period])
       .filter((m) => missingChannels(m).length && !(state.period === ALL && isEmpty(m)));
     const coverage = $("coverage");
     coverage.hidden = !partial.length;
@@ -222,7 +228,7 @@
 
   function renderMonthly() {
     const el = $("monthly");
-    const rows = state.months.map((m) => {
+    const rows = visibleMonths().map((m) => {
       const s = monthSummary(m);
       return { month: m, income: s.income, expense: s.expense, net: s.income - s.expense,
         partial: missingChannels(m).length > 0 };
@@ -368,13 +374,13 @@
     $("sources-toggle").setAttribute("aria-expanded", open);
     $("sources-toggle").classList.toggle("closed", !open);
     const on = state.channels.filter(isOn).length;
-    const gaps = state.months.reduce((n, m) => n + missingChannels(m).length, 0);
+    const gaps = visibleMonths().reduce((n, m) => n + missingChannels(m).length, 0);
     $("sources-summary").textContent = open
       ? "rows per channel and month — untick to exclude"
       : `${on} of ${state.channels.length} channels` + (gaps ? ` · ${gaps} missing` : "");
     if (!open) return;
 
-    const months = state.months;
+    const months = visibleMonths();
     const count = {};
     for (const tx of state.txs) count[tx.channel + "|" + tx.month] = (count[tx.channel + "|" + tx.month] || 0) + 1;
 
@@ -430,10 +436,14 @@
       const used = new Set(state.txs.map((tx) => tx.channel));
       state.allChannels = ref.channels;
       state.channels = ref.channels.map((c) => c.name).filter((c) => used.has(c));
+      if (state.year !== ALL && !years().includes(state.year)) state.year = ALL;
       if (state.period !== ALL && !state.months.includes(state.period)) state.period = ALL;
+      $("year").innerHTML = `<option value="">All</option>` + years().map((y) => `<option>${y}</option>`).join("");
+      $("year").value = state.year;
 
       $("signin").hidden = true;
       $("periods").hidden = false;
+      $("year-wrap").hidden = false;
       $("reload").hidden = false;
       $("dash").hidden = false;
       render();
@@ -446,6 +456,7 @@
     $("signin").hidden = false;
     $("dash").hidden = true;
     $("periods").hidden = true;
+    $("year-wrap").hidden = true;
     $("reload").hidden = true;
     $("connect").hidden = false;
     $("status").textContent = e.message === "Not signed in"
@@ -469,6 +480,7 @@
     }
   });
   $("reload").addEventListener("click", () => load().catch(showError));
+  $("year").addEventListener("change", (e) => { state.year = e.target.value; setPeriod(ALL); });
   $("sources-toggle").addEventListener("click", () => { state.sourcesOpen = !state.sourcesOpen; render(); });
   $("sources-all").addEventListener("click", () => { state.excluded.clear(); update(); });
   $("sources-none").addEventListener("click", () => { state.excluded = new Set(state.channels); update(); });
