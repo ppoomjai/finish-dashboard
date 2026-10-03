@@ -11,6 +11,7 @@
     channels: [],       // channels that have rows in any month
     allChannels: [],    // every channel in the channel tab: { name, type }
     excluded: new Set(), // channels unticked in Sources
+    sourcesOpen: true,  // Sources grid expanded
     txs: [],            // every transaction, with .month
     period: ALL,        // always opens on All months
     category: ALL,
@@ -25,12 +26,13 @@
       if (!p) return;
       state.excluded = new Set(p.excluded || []);
       $("hide-transfer").checked = p.hideTransfer ?? true;
+      state.sourcesOpen = p.sourcesOpen ?? true;
     } catch {}
   }
   function savePrefs() {
     try {
       localStorage.setItem(PREFS, JSON.stringify({
-        excluded: [...state.excluded], hideTransfer: $("hide-transfer").checked,
+        excluded: [...state.excluded], hideTransfer: $("hide-transfer").checked, sourcesOpen: state.sourcesOpen,
       }));
     } catch {}
   }
@@ -200,7 +202,20 @@
   }
 
   // Channel × month grid: rows per channel and month; the checkbox includes the channel.
+  // Collapsed, only a one-line summary is shown.
   function renderSources() {
+    const open = state.sourcesOpen;
+    $("sources").hidden = !open;
+    $("sources-tools").hidden = !open;
+    $("sources-toggle").setAttribute("aria-expanded", open);
+    $("sources-toggle").classList.toggle("closed", !open);
+    const on = state.channels.filter(isOn).length;
+    const gaps = state.months.reduce((n, m) => n + missingChannels(m).length, 0);
+    $("sources-summary").textContent = open
+      ? "rows per channel and month — untick to exclude"
+      : `${on} of ${state.channels.length} channels included` + (gaps ? ` · ${gaps} missing month(s)` : "");
+    if (!open) return;
+
     const months = state.months;
     const count = {};
     for (const tx of state.txs) count[tx.channel + "|" + tx.month] = (count[tx.channel + "|" + tx.month] || 0) + 1;
@@ -361,6 +376,7 @@
   });
   $("reload").addEventListener("click", () => load().catch(showError));
   $("period").addEventListener("change", (e) => { state.period = e.target.value; render(); });
+  $("sources-toggle").addEventListener("click", () => { state.sourcesOpen = !state.sourcesOpen; render(); });
   $("sources-all").addEventListener("click", () => { state.excluded.clear(); render(); });
   $("sources-none").addEventListener("click", () => { state.excluded = new Set(state.channels); render(); });
   $("search").addEventListener("input", () => render());

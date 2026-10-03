@@ -46,8 +46,12 @@
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Sources <small class="muted">rows per channel and month — untick to exclude</small></h2>
-          <div class="tx-tools">
+          <button id="sources-toggle" class="collapse" aria-expanded="true" aria-controls="sources">
+            <svg class="chev" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <h2>Sources</h2>
+            <small id="sources-summary" class="muted">rows per channel and month — untick to exclude</small>
+          </button>
+          <div class="tx-tools" id="sources-tools">
             <button id="sources-all" class="chip">All</button>
             <button id="sources-none" class="chip">None</button>
           </div>

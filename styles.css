@@ -162,6 +162,12 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16p
 .fill-expense { background: var(--expense); }
 
 /* sources grid */
+.collapse { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; text-align: left; }
+.collapse h2 { margin: 0; }
+.collapse .chev { flex: none; color: var(--muted); transition: transform .15s; }
+.collapse.closed .chev { transform: rotate(-90deg); }
+.collapse:hover h2 { text-decoration: underline; text-underline-offset: 3px; }
+.panel-head:has(.collapse.closed) { margin-bottom: 0; }
 .sources table { font-size: 13px; }
 .sources th, .sources td { border-bottom: 1px solid var(--border); padding: 6px 8px; }
 .sources thead th { text-align: center; }
