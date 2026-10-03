@@ -2,40 +2,100 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08090c" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Fin-ish">
   <title>Fin-ish</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="topbar">
-    <h1>Fin-ish</h1>
-    <div class="filters" id="filters" hidden>
-      <select id="period" aria-label="Period"></select>
+    <div class="brand">
+      <span class="logo" aria-hidden="true">F</span>
+      <span class="brand-name">Fin-ish</span>
     </div>
+    <nav id="periods" class="periods" aria-label="Period" hidden></nav>
     <div class="topbar-actions">
-      <button id="reload" hidden>Reload</button>
-      <button id="connect" class="primary">Sign in</button>
+      <button id="reload" class="icon-btn" title="Reload from Google Sheets" aria-label="Reload" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </div>
   </header>
 
   <main>
-    <p id="status" class="empty">Sign in with Google to load “Expense working sheets”.</p>
+    <section id="signin" class="signin">
+      <div class="signin-card">
+        <span class="logo logo-lg" aria-hidden="true">F</span>
+        <h1>Your money, at a glance</h1>
+        <p class="muted">Income, spending and savings — straight from your “Expense working sheets”.</p>
+        <button id="connect" class="google-btn">
+          <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.200 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+          Sign in with Google
+        </button>
+        <p id="status" class="status muted"></p>
+      </div>
+    </section>
 
-    <div id="dash" hidden>
-      <section class="cards">
-        <div class="card"><span>Income</span><strong id="sum-income">–</strong><small id="sub-income"></small></div>
-        <div class="card"><span>Expenses</span><strong id="sum-expense">–</strong><small id="sub-expense"></small></div>
-        <div class="card"><span>Net</span><strong id="sum-net">–</strong><small id="sub-net"></small></div>
-        <div class="card"><span>Savings rate</span><strong id="sum-rate">–</strong><small>net ÷ income</small></div>
-        <div class="card"><span>Invested</span><strong id="sum-invest">–</strong><small>not counted as expense</small></div>
+    <div id="dash" class="dash" hidden>
+      <!-- overview -->
+      <section class="bento">
+        <article class="card hero">
+          <div class="hero-main">
+            <span class="eyebrow" id="hero-label">Net</span>
+            <strong id="sum-net" class="hero-num">–</strong>
+            <span id="sub-net" class="sub"></span>
+            <div id="spark" class="spark" aria-hidden="true"></div>
+          </div>
+          <div class="hero-side">
+            <div class="ring" id="ring"></div>
+            <span class="eyebrow">Savings rate</span>
+            <div class="invest">
+              <span class="eyebrow">Invested</span>
+              <strong id="sum-invest">–</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="card stat">
+          <div class="stat-head">
+            <span class="badge badge-in" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="eyebrow">Income</span>
+          </div>
+          <strong id="sum-income" class="stat-num">–</strong>
+          <span id="sub-income" class="sub"></span>
+        </article>
+
+        <article class="card stat">
+          <div class="stat-head">
+            <span class="badge badge-out" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 5v14M19 12l-7 7-7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="eyebrow">Expenses</span>
+          </div>
+          <strong id="sum-expense" class="stat-num">–</strong>
+          <span id="sub-expense" class="sub"></span>
+        </article>
       </section>
 
-      <p id="warn" class="warn" hidden></p>
-      <p id="coverage" class="coverage" hidden></p>
+      <div class="alerts">
+        <p id="warn" class="alert" hidden></p>
+        <p id="coverage" class="alert" hidden></p>
+      </div>
 
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Income vs expenses by month</h2>
+      <!-- cash flow -->
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <h2>Cash flow</h2>
+            <p class="muted small">Tap a month to focus it</p>
+          </div>
           <div class="legend">
             <span><i class="sw sw-income"></i>Income</span>
             <span><i class="sw sw-expense"></i>Expenses</span>
@@ -44,52 +104,59 @@
         <div id="monthly" class="chart"></div>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
+      <!-- categories -->
+      <div class="two-col">
+        <section class="card">
+          <div class="card-head">
+            <h2>Spending</h2>
+            <span class="muted small">tap to filter</span>
+          </div>
+          <div id="by-expense" class="cats"></div>
+        </section>
+        <section class="card">
+          <div class="card-head">
+            <h2>Income</h2>
+            <span class="muted small">tap to filter</span>
+          </div>
+          <div id="by-income" class="cats"></div>
+        </section>
+      </div>
+
+      <!-- transactions -->
+      <section class="card">
+        <div class="card-head wrap">
+          <h2>Transactions <span id="tx-count" class="count"></span></h2>
+          <div class="tools">
+            <button id="clear-cat" class="chip chip-active" hidden></button>
+            <label class="switch">
+              <input type="checkbox" id="hide-transfer" checked>
+              <span class="track" aria-hidden="true"></span>
+              <span>Hide transfers</span>
+            </label>
+            <label class="search">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              <input type="search" id="search" placeholder="Search" aria-label="Search transactions">
+            </label>
+          </div>
+        </div>
+        <div id="tx-list" class="tx-list"></div>
+        <button id="more" class="more" hidden>Show more</button>
+      </section>
+
+      <!-- data sources -->
+      <section class="card">
+        <div class="card-head">
           <button id="sources-toggle" class="collapse" aria-expanded="true" aria-controls="sources">
             <svg class="chev" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <h2>Sources</h2>
-            <small id="sources-summary" class="muted">rows per channel and month — untick to exclude</small>
+            <h2>Data sources</h2>
+            <small id="sources-summary" class="muted"></small>
           </button>
-          <div class="tx-tools" id="sources-tools">
+          <div class="tools" id="sources-tools">
             <button id="sources-all" class="chip">All</button>
             <button id="sources-none" class="chip">None</button>
           </div>
         </div>
-        <div id="sources" class="table-wrap sources"></div>
-      </section>
-
-      <div class="grid">
-        <section class="panel">
-          <div class="panel-head">
-            <h2>Expenses by category</h2>
-            <small class="muted">click a bar to filter</small>
-          </div>
-          <div id="by-expense"></div>
-        </section>
-        <section class="panel">
-          <div class="panel-head">
-            <h2>Income by category</h2>
-          </div>
-          <div id="by-income"></div>
-        </section>
-      </div>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h2>Transactions <small id="tx-count" class="muted"></small></h2>
-          <div class="tx-tools">
-            <button id="clear-cat" class="chip" hidden></button>
-            <label class="check"><input type="checkbox" id="hide-transfer" checked> Hide transfers</label>
-            <input type="search" id="search" placeholder="Search name, category, remark">
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table id="tx-table">
-            <thead><tr><th>Date</th><th>Name</th><th>Category</th><th>Channel</th><th class="num">In</th><th class="num">Out</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
+        <div id="sources" class="sources"></div>
       </section>
     </div>
   </main>
