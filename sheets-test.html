@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fin-ish · Sheets test</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Google Sheets connection</h2>
+        <button id="connect" class="primary">Sign in &amp; load</button>
+      </div>
+      <p id="status" class="empty">Not connected.</p>
+      <pre id="output"></pre>
+    </section>
+  </main>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="config.js"></script>
+  <script src="sheets.js"></script>
+  <script>
+    const status = document.getElementById("status");
+    const output = document.getElementById("output");
+    document.getElementById("connect").addEventListener("click", async () => {
+      try {
+        status.textContent = "Signing in…";
+        await FinishSheets.signIn();
+        status.textContent = "Loading sheet…";
+        const now = new Date();
+        const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const ref = await FinishSheets.loadReference();
+        const months = await FinishSheets.listMonths();
+        const transactions = await FinishSheets.loadMonth(month);
+        const data = { ...ref, months, [month]: transactions };
+        status.textContent = `Loaded ${ref.categories.length} categories, ${ref.channels.length} channels, ` +
+          `${ref.merchants.length} merchants, ${months.length} month tabs, ` +
+          `${transactions.length} transactions in ${month}.`;
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        status.textContent = "Error: " + e.message;
+      }
+    });
+  </script>
+</body>
+</html>
