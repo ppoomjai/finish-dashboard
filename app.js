@@ -323,7 +323,7 @@
     period.innerHTML = `<option value="">All months</option>` +
       [...state.months].reverse().map((m) =>
         `<option value="${m}">${monthLabel(m, true)}${missingChannels(m).length ? " ⚠" : ""}</option>`).join("");
-    if (!state.months.includes(state.period)) state.period = ALL;
+    if (state.period !== ALL && !state.months.includes(state.period)) state.period = ALL;
     period.value = state.period;
 
     status.hidden = true;
