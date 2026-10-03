@@ -12,7 +12,7 @@
     allChannels: [],    // every channel in the channel tab: { name, type }
     excluded: new Set(), // channels unticked in Sources
     txs: [],            // every transaction, with .month
-    period: null,       // null until chosen: opens on the latest month with data
+    period: ALL,        // always opens on All months
     category: ALL,
   };
 
@@ -23,7 +23,6 @@
     try {
       const p = JSON.parse(localStorage.getItem(PREFS));
       if (!p) return;
-      state.period = p.period;
       state.excluded = new Set(p.excluded || []);
       $("hide-transfer").checked = p.hideTransfer ?? true;
     } catch {}
@@ -31,7 +30,7 @@
   function savePrefs() {
     try {
       localStorage.setItem(PREFS, JSON.stringify({
-        period: state.period, excluded: [...state.excluded], hideTransfer: $("hide-transfer").checked,
+        excluded: [...state.excluded], hideTransfer: $("hide-transfer").checked,
       }));
     } catch {}
   }
@@ -324,9 +323,7 @@
     period.innerHTML = `<option value="">All months</option>` +
       [...state.months].reverse().map((m) =>
         `<option value="${m}">${monthLabel(m, true)}${missingChannels(m).length ? " ⚠" : ""}</option>`).join("");
-    if (state.period !== ALL && !state.months.includes(state.period)) {
-      state.period = [...new Set(state.txs.map((tx) => tx.month))].sort().pop() ?? ALL;
-    }
+    if (!state.months.includes(state.period)) state.period = ALL;
     period.value = state.period;
 
     status.hidden = true;
