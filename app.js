@@ -235,8 +235,9 @@
     });
     if (!rows.length) { el.innerHTML = '<p class="empty">No month tabs yet.</p>'; return; }
 
-    const W = Math.max(el.clientWidth, 300), H = 260;
-    const pad = { l: 40, r: 4, t: 10, b: 44 };
+    // Fit the card; phones get a shorter chart, a narrower axis and terse notes.
+    const W = Math.max(el.clientWidth, 240), narrow = W < 480, H = narrow ? 220 : 260;
+    const pad = { l: narrow ? 34 : 40, r: 4, t: 10, b: 44 };
     const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
     const max = Math.max(1, ...rows.flatMap((r) => [r.income, r.expense]));
     const min = Math.min(0, ...rows.flatMap((r) => [r.income, r.expense]));
@@ -245,7 +246,7 @@
     const y = (v) => pad.t + ih - ((v - bottom) / (top - bottom)) * ih;
 
     const band = iw / rows.length;
-    const barW = Math.max(4, Math.min(22, (band - 16) / 2));
+    const barW = Math.max(3, Math.min(22, (band - (narrow ? 8 : 16)) / 2));
     let svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Monthly income and expenses">`;
     for (let v = bottom; v <= top + 1e-9; v += step) {
       svg += `<line class="grid-line${v === 0 ? " zero" : ""}" x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}"/>`;
@@ -259,7 +260,7 @@
       svg += bar(cx - barW - 1, barW, y(Math.max(0, r.income)), y(Math.min(0, r.income)), "income");
       svg += bar(cx + 1, barW, y(Math.max(0, r.expense)), y(Math.min(0, r.expense)), "expense");
       svg += `<text class="axis" x="${cx}" y="${H - 26}" text-anchor="middle">${monthLabel(r.month)}</text>`;
-      const note = isEmpty(r.month) ? "no data" : r.partial ? "⚠ partial" : "";
+      const note = isEmpty(r.month) ? (narrow ? "–" : "no data") : r.partial ? (narrow ? "⚠" : "⚠ partial") : "";
       if (note) svg += `<text class="partial" x="${cx}" y="${H - 10}" text-anchor="middle">${note}</text>`;
       svg += `</g>`;
     });

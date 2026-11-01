@@ -8,6 +8,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Fin-ish">
   <title>Fin-ish</title>
+  <script>
+    // Apply the saved theme before first paint; with none saved, the OS setting wins.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("finish.theme"); } catch (e) {}
+      if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
@@ -25,6 +33,10 @@
     </label>
     <nav id="periods" class="periods" aria-label="Month" hidden></nav>
     <div class="topbar-actions">
+      <button id="theme" class="icon-btn" title="Switch to light mode" aria-label="Switch to light mode">
+        <svg class="i-sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      </button>
       <button id="reload" class="icon-btn" title="Reload from Google Sheets" aria-label="Reload" hidden>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -168,6 +180,7 @@
   <div id="tip" class="tip" hidden></div>
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="theme.js"></script>
   <script src="config.js"></script>
   <script src="sheets.js"></script>
   <script src="app.js"></script>

@@ -1,4 +1,4 @@
-/* Fin-ish — dark-first glass UI, light mode follows the OS. */
+/* Fin-ish — dark-first glass UI. Light/dark follows the OS until the toggle picks one. */
 
 :root {
   color-scheme: light;
@@ -29,8 +29,10 @@
   --radius-sm: 14px;
 }
 
+/* Dark tokens: used when the OS is dark (unless the toggle chose light),
+   or whenever the toggle chose dark. Keep both blocks in sync. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #08090c;
     --bg-glow-1: rgba(57, 135, 229, .16);
@@ -55,6 +57,31 @@
     --hero-a: rgba(57, 135, 229, .22);
     --hero-b: rgba(144, 133, 233, .14);
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #08090c;
+  --bg-glow-1: rgba(57, 135, 229, .16);
+  --bg-glow-2: rgba(144, 133, 233, .12);
+  --surface: rgba(255, 255, 255, .045);
+  --surface-solid: #121419;
+  --seg-on: rgba(255, 255, 255, .16);
+  --surface-2: rgba(255, 255, 255, .05);
+  --hairline: rgba(255, 255, 255, .08);
+  --text: #f5f7fa;
+  --muted: #8b93a1;
+  --faint: #5d6470;
+  --shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 12px 32px rgba(0, 0, 0, .35);
+  --grid: rgba(255, 255, 255, .06);
+  --pos: #34c759;
+  --neg: #ff6961;
+  --warn: #fbbf24;
+  --warn-bg: rgba(251, 191, 36, .10);
+  --income: #3987e5;
+  --expense: #d95926;
+  --accent: #5aa0f0;
+  --hero-a: rgba(57, 135, 229, .22);
+  --hero-b: rgba(144, 133, 233, .14);
 }
 
 * { box-sizing: border-box; }
@@ -194,12 +221,20 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .icon-btn:hover { background: var(--surface-2); }
 .icon-btn.spin svg { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* the theme button shows the mode a click switches to */
+#theme .i-moon, #theme[data-mode="light"] .i-sun { display: none; }
+#theme[data-mode="light"] .i-moon { display: block; }
 
 @media (max-width: 720px) {
   .topbar { flex-wrap: wrap; row-gap: 8px; }
   .periods { order: 3; flex-basis: 100%; margin: 0; }
   .year + .periods { margin: 0; }
   .search input { width: 140px; }
+}
+@media (max-width: 520px) {
+  .topbar { gap: 10px; }
+  .topbar-actions { margin-left: 0; } /* year select sits next to the buttons */
+  .year select { height: 36px; }
 }
 
 /* ---------- layout ---------- */
@@ -563,6 +598,44 @@ main {
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 button.primary { padding: 8px 14px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font-weight: 600; }
 pre { overflow: auto; font-size: 12px; }
+
+/* ---------- phones ---------- */
+
+@media (max-width: 520px) {
+  main { padding: 12px 12px calc(32px + env(safe-area-inset-bottom)); }
+  .dash, .bento, .two-col { gap: 12px; }
+  .card { padding: 16px; border-radius: 18px; }
+  .card-head { margin-bottom: 12px; }
+  .signin-card { padding: 32px 20px; }
+  .signin-card h1 { font-size: 22px; }
+  .stat-head { padding-bottom: 12px; }
+  .hero-num { font-size: 32px; }
+  .stat-num { font-size: 21px; }
+  .legend { gap: 10px; font-size: 12px; }
+  /* transactions: tools take their own row, search fills it */
+  .card-head.wrap .tools { width: 100%; }
+  .search { flex: 1; min-width: 0; }
+  .search input { width: 100%; max-width: none; }
+  .cat { grid-template-columns: 36px 1fr auto; }
+  .collapse h2 { white-space: nowrap; }
+  .collapse small { display: none; }
+  #sources-tools { flex-wrap: nowrap; }
+  /* data sources: keep the channel column visible while scrolling months */
+  .sources tbody th, .sources thead th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--surface-solid);
+  }
+}
+@media (max-width: 380px) {
+  .bento { grid-template-columns: 1fr; }
+  .brand-name { display: none; }
+}
+/* no hover on touch screens: tapping a month selects it instead */
+@media (hover: none) {
+  .tip { display: none !important; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
