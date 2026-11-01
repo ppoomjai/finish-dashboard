@@ -124,6 +124,12 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
   border-bottom: 1px solid var(--hairline);
 }
 .topbar-row { display: flex; align-items: center; gap: 16px; }
+/* signed in: a full-width line under the tabs row; the open tab's underline sits on it */
+.topbar:has(#filters:not([hidden])) .topbar-row {
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-right))) 0 calc(-1 * max(16px, env(safe-area-inset-left)));
+  padding: 0 max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--hairline);
+}
 .filters {
   display: flex;
   align-items: center;
@@ -167,7 +173,7 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
 }
 .year select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .year svg { position: absolute; right: 11px; pointer-events: none; }
-.periods, .views {
+.periods {
   display: flex;
   gap: 4px;
   padding: 4px;
@@ -178,9 +184,37 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
   border: 1px solid var(--hairline);
   border-radius: 999px;
 }
-.views { margin: 0 auto; flex: none; }
+/* view tabs: plain labels with an underline on the open one */
+.views { display: flex; gap: 20px; margin: 0 auto; flex: none; align-self: stretch; }
+.views button {
+  position: relative;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color .15s;
+}
+.views button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -11px; /* on the line under the tabs row */
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transition: transform .2s;
+}
+.views button:hover { color: var(--text); }
+.views button.on { color: var(--text); font-weight: 600; }
+.views button.on::after { transform: scaleX(1); }
+.views button:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
 .periods::-webkit-scrollbar { display: none; }
-.periods button, .views button {
+.periods button {
   position: relative;
   flex: none;
   padding: 6px 14px;
@@ -193,8 +227,8 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
   white-space: nowrap;
   transition: background .15s, color .15s;
 }
-.periods button:hover, .views button:hover { color: var(--text); }
-.periods button.on, .views button.on {
+.periods button:hover { color: var(--text); }
+.periods button.on {
   background: var(--seg-on);
   font-weight: 600;
   color: var(--text);
@@ -233,7 +267,7 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
 }
 @media (max-width: 520px) {
   .topbar-row { gap: 10px; }
-  .views button { padding: 6px 12px; }
+  .views { gap: 16px; }
   .brand-name { display: none; }
   .year select { height: 36px; }
 }
@@ -695,7 +729,8 @@ pre { overflow: auto; font-size: 12px; }
 @media (max-width: 380px) {
   .bento { grid-template-columns: 1fr; }
   .topbar-row, .topbar-actions { gap: 6px; }
-  .views button { padding: 6px 9px; font-size: 13px; }
+  .views { gap: 12px; }
+  .views button { font-size: 14px; }
   .icon-btn { width: 34px; height: 34px; }
 }
 /* no hover on touch screens: tapping a month selects it instead */

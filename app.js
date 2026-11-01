@@ -21,7 +21,6 @@
     catsOpen: { expense: false, income: false }, // show every category, not just the top ones
     view: "dash",       // "dash" or "subs"
     subsCats: ["Subscription", "Gym", "Domain & hosting"], // categories the Subscriptions view counts
-    oneOffsOpen: false, // one-off charges listed on the Subscriptions view
   };
   // Categories offered on the Subscriptions view; the defaults above are switched on.
   const SUB_CATS = ["Subscription", "Gym", "Domain & hosting", "Insurance", "Bills & Utilities", "Installment"];
@@ -456,56 +455,97 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }
 
-  // Services seen in the counted categories, judged as of the last month of the
-  // selected period: active = paid in 2+ months with the latest charge in that month or
-  // the one before; new = first seen that recently; stopped = recurring but not since.
+  const monthDiff = (a, b) => {
+    const [ya, ma] = a.split("-").map(Number), [yb, mb] = b.split("-").map(Number);
+    return (yb - ya) * 12 + (mb - ma);
+  };
+
+  // Billing cycles a service can be on, in months.
+  const CYCLES = [
+    [1, "Monthly", "mo"], [2, "Every 2 months", "2 mo"], [3, "Quarterly", "qtr"],
+    [6, "Every 6 months", "6 mo"], [12, "Yearly", "yr"],
+  ];
+  const cycleOf = (n) => CYCLES.find(([m]) => m === n);
+  // Categories where a single charge is most likely an annual plan (renewals, insurance).
+  const ANNUAL_GUESS = new Set(["Subscription", "Domain & hosting", "Insurance"]);
+
+  // Recurring services in the counted categories, judged as of the last month of the
+  // selected period, using all history up to then. The cycle is the typical gap between
+  // paid months, snapped to 1/2/3/6/12. A service is active until its next charge is
+  // overdue by more than a month. Paid once: within the last month it is "new" with no
+  // known cycle yet; earlier, in ANNUAL_GUESS categories, it is taken as a yearly plan
+  // (it did not come back the next month); anything else is a one-off and left out.
   function subscriptionServices() {
     const scope = state.period === ALL ? visibleMonths() : visibleMonths().filter((m) => m <= state.period);
     const asOf = [...scope].reverse().find((m) => !isEmpty(m)) || scope[scope.length - 1];
-    const recent = asOf ? [asOf, addMonths(asOf, -1)] : [];
+    if (!asOf) return { services: [], asOf };
     const cats = new Set(state.subsCats);
     const byKey = new Map();
     for (const tx of state.txs) {
-      if (!inChannel(tx) || !cats.has(tx.category) || !scope.includes(tx.month)) continue;
+      if (!inChannel(tx) || !cats.has(tx.category) || tx.month > asOf) continue;
       const amount = (tx.out || 0) - (tx.in || 0);
       if (Math.abs(amount) < 0.005) continue;
       const key = serviceKey(tx.name) || tx.name;
-      if (!byKey.has(key)) byKey.set(key, { key, name: serviceName(tx.name) || tx.name, category: tx.category,
-        channels: new Set(), charges: [], byMonth: {} });
+      if (!byKey.has(key)) byKey.set(key, { key, name: serviceName(tx.name) || tx.name, channels: new Set(), charges: [], byMonth: {} });
       const s = byKey.get(key);
       s.channels.add(tx.channel);
       s.charges.push(tx);
       s.byMonth[tx.month] = (s.byMonth[tx.month] || 0) + amount;
     }
-    const services = [...byKey.values()].map((s) => {
+    const services = [];
+    for (const s of byKey.values()) {
       s.charges.sort((a, b) => String(b.date).localeCompare(String(a.date)));
       const months = Object.keys(s.byMonth).sort();
       const last = s.charges[0];
-      // Typical monthly cost: average of the last three months it was paid in.
-      const lastThree = months.slice(-3).map((m) => s.byMonth[m]);
-      const monthly = lastThree.reduce((a, v) => a + v, 0) / lastThree.length;
-      const isRecent = recent.includes(months[months.length - 1]);
-      const status = months.length >= 2 ? (isRecent ? "active" : "stopped") : (isRecent ? "new" : "oneoff");
-      const total = months.reduce((a, m) => a + s.byMonth[m], 0);
-      return { ...s, months, last, monthly, status, total, category: last.category };
-    });
-    return { services, scope, asOf };
+      const category = last.category;
+      const lastMonth = months[months.length - 1];
+      let cycle = null, guessed = false;
+      if (months.length >= 2) {
+        const gaps = months.slice(1).map((m, i) => monthDiff(months[i], m)).sort((a, b) => a - b);
+        const typical = gaps[Math.floor(gaps.length / 2)];
+        cycle = CYCLES.reduce((best, c) => Math.abs(c[0] - typical) < Math.abs(best[0] - typical) ? c : best);
+      } else if (monthDiff(lastMonth, asOf) <= 1) {
+        // first charge just now: cycle unknown until the next one
+      } else if (ANNUAL_GUESS.has(category)) {
+        cycle = cycleOf(12);
+        guessed = true;
+      } else {
+        continue; // a one-off, not recurring
+      }
+      // Per charge: average of the last three paid months.
+      const recent = months.slice(-3).map((m) => s.byMonth[m]);
+      const perCharge = recent.reduce((a, v) => a + v, 0) / recent.length;
+      if (!cycle) {
+        services.push({ ...s, category, months, last, cycle: null, guessed, perCharge, perMonth: 0, next: null,
+          status: "new", total: perCharge });
+        continue;
+      }
+      const next = addMonths(lastMonth, cycle[0]);
+      const overdue = monthDiff(next, asOf); // months past the expected charge
+      // An "n/n" installment on its last charge has ended.
+      const inst = String(last.name).match(/\b(\d+)\s*\/\s*(\d+)\b/);
+      const finished = inst && Number(inst[1]) >= Number(inst[2]);
+      const status = finished || overdue > 1 ? "stopped" : "active";
+      services.push({ ...s, category, months, last, cycle, guessed, perCharge, perMonth: perCharge / cycle[0], next, status,
+        total: months.reduce((a, m) => a + s.byMonth[m], 0) });
+    }
+    return { services, asOf };
   }
 
   function renderSubs() {
-    const { services, scope, asOf } = subscriptionServices();
-    const live = services.filter((s) => s.status === "active" || s.status === "new").sort((a, b) => b.monthly - a.monthly);
+    const { services, asOf } = subscriptionServices();
+    const live = services.filter((s) => s.status === "active");
+    const fresh = services.filter((s) => s.status === "new");
     const stopped = services.filter((s) => s.status === "stopped").sort((a, b) => String(b.last.date).localeCompare(String(a.last.date)));
-    const oneoff = services.filter((s) => s.status === "oneoff").sort((a, b) => b.total - a.total);
 
-    const runRate = live.reduce((a, s) => a + s.monthly, 0);
+    const perMonth = live.reduce((a, s) => a + s.perMonth, 0);
     $("subs-label").textContent = "Recurring · per month" + (asOf ? ` · as of ${monthLabel(asOf, true)}` : "");
-    $("subs-monthly").textContent = baht(runRate);
-    $("subs-yearly").textContent = runRate ? `≈ ${baht(runRate * 12)} a year at this rate` : "";
+    $("subs-monthly").textContent = baht(perMonth);
+    $("subs-yearly").textContent = perMonth ? `≈ ${baht(perMonth * 12)} a year · yearly and quarterly plans spread per month` : "";
     $("subs-active").textContent = live.length;
-    const newOnes = live.filter((s) => s.status === "new").length;
-    $("subs-active-sub").textContent = [newOnes && `${newOnes} new`, stopped.length && `${stopped.length} stopped`]
-      .filter(Boolean).join(" · ");
+    const byCycle = CYCLES.map(([m, label]) => [label, live.filter((s) => s.cycle[0] === m).length]).filter(([, n]) => n);
+    $("subs-active-sub").textContent = [...byCycle.map(([label, n]) => `${n} ${label.toLowerCase()}`),
+      fresh.length && `${fresh.length} new`].filter(Boolean).join(" · ");
 
     const cats = new Set(state.subsCats);
     const spent = state.txs.filter((tx) => inChannel(tx) && inPeriod(tx) && cats.has(tx.category))
@@ -524,8 +564,8 @@
       render();
     }));
 
-    // Up to the last 12 months of the scope, as a strip of paid / not paid cells.
-    const strip = scope.slice(-12);
+    // The 12 calendar months up to asOf: which ones had a charge.
+    const strip = asOf ? Array.from({ length: 12 }, (_, i) => addMonths(asOf, i - 11)) : [];
     const row = (s) => {
       const peak = Math.max(...strip.map((m) => s.byMonth[m] || 0), 1);
       const cells = strip.map((m) => {
@@ -533,17 +573,19 @@
         return `<i class="${v ? "paid" : ""}" style="${v ? `opacity:${(0.35 + 0.65 * v / peak).toFixed(2)}` : ""}"` +
           ` title="${monthLabel(m, true)}: ${v ? baht(v, 2) : "–"}"></i>`;
       }).join("");
-      const badge = s.status === "new" ? '<span class="tag tag-new">new</span>'
-        : s.status === "stopped" ? '<span class="tag">stopped</span>' : "";
+      const tags = (s.status === "new" ? '<span class="tag tag-new">new</span>' : "") +
+        (s.guessed ? '<span class="tag" title="Paid once so far — assumed to be a yearly plan">yearly?</span>' : "");
+      const when = s.status === "active" ? `next ~${monthLabel(s.next, true)}` : `last ${dayLabel(s.last.date)}`;
       const charges = s.charges.slice(0, 24).map((tx) =>
         `<li><span>${esc(dayLabel(tx.date))}</span><span class="muted">${esc(tx.channel)}</span><span class="amt">${baht((tx.out || 0) - (tx.in || 0), 2)}</span></li>`).join("");
+      const perMonth = s.cycle && s.cycle[0] > 1 ? `<small>≈ ${baht(s.perMonth)} / mo</small>` : "";
       return `<details class="svc st-${s.status}">
         <summary>
           <span class="ico" aria-hidden="true">${icon(s.category)}</span>
-          <span class="main"><span class="title">${esc(s.name)} ${badge}</span>
-            <span class="meta">${esc(s.category)} · ${esc([...s.channels].join(", "))} · last ${esc(dayLabel(s.last.date))}</span></span>
+          <span class="main"><span class="title">${esc(s.name)} ${tags}</span>
+            <span class="meta">${esc(s.category)} · ${esc([...s.channels].join(", "))} · ${esc(when)}</span></span>
           <span class="months" aria-hidden="true">${cells}</span>
-          <span class="amt">${baht(s.monthly)}<small>${s.status === "oneoff" ? "once" : "/ mo"}</small></span>
+          <span class="amt">${baht(s.perCharge)}<small>${s.cycle ? "/ " + s.cycle[2] : "first charge"}</small>${perMonth}</span>
         </summary>
         <ul class="charges">${charges}</ul>
       </details>`;
@@ -551,13 +593,11 @@
     const group = (title, list, note) => list.length
       ? `<h3 class="grp">${title} <span class="count">${list.length}</span>${note ? `<small class="muted">${note}</small>` : ""}</h3>` + list.map(row).join("")
       : "";
-    let html = group("Active", live, "") + group("Stopped", stopped, "recurring before, nothing in the last two months");
-    if (oneoff.length) {
-      html += `<button class="more" id="oneoffs">${state.oneOffsOpen ? "Hide" : "Show"} ${oneoff.length} one-off charge${oneoff.length > 1 ? "s" : ""}</button>`;
-      if (state.oneOffsOpen) html += group("One-off", oneoff, "paid once in this period");
-    }
-    $("subs-list").innerHTML = html || '<p class="empty">Nothing in these categories for this period.</p>';
-    $("oneoffs")?.addEventListener("click", () => { state.oneOffsOpen = !state.oneOffsOpen; render(); });
+    let html = CYCLES.map(([m, label]) =>
+      group(label, live.filter((s) => s.cycle[0] === m).sort((a, b) => b.perCharge - a.perCharge), "")).join("");
+    html += group("New", fresh, "first charge just now — the cycle shows once it repeats; not in the total yet");
+    html += group("Stopped", stopped, "next charge never came, or the last installment was paid");
+    $("subs-list").innerHTML = html || '<p class="empty">No recurring payments in these categories yet.</p>';
   }
 
   // ---------- tooltip ----------
