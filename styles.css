@@ -117,14 +117,19 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
   position: sticky;
   top: 0;
   z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 16px;
   padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
   background: color-mix(in srgb, var(--bg) 72%, transparent);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--hairline);
+}
+.topbar-row { display: flex; align-items: center; gap: 16px; }
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 1088px; /* lines up with main's content box */
+  margin: 10px auto 0;
 }
 .brand { display: flex; align-items: center; gap: 10px; flex: none; }
 .brand-name { font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
@@ -146,7 +151,6 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
   display: inline-flex;
   align-items: center;
   flex: none;
-  margin-left: auto;
   color: var(--muted);
 }
 .year select {
@@ -163,12 +167,10 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
 }
 .year select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .year svg { position: absolute; right: 11px; pointer-events: none; }
-.year + .periods { margin-left: 0; }
-.periods {
+.periods, .views {
   display: flex;
   gap: 4px;
   padding: 4px;
-  margin: 0 auto;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -176,8 +178,9 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
   border: 1px solid var(--hairline);
   border-radius: 999px;
 }
+.views { margin: 0 auto; flex: none; }
 .periods::-webkit-scrollbar { display: none; }
-.periods button {
+.periods button, .views button {
   position: relative;
   flex: none;
   padding: 6px 14px;
@@ -190,8 +193,8 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
   white-space: nowrap;
   transition: background .15s, color .15s;
 }
-.periods button:hover { color: var(--text); }
-.periods button.on {
+.periods button:hover, .views button:hover { color: var(--text); }
+.periods button.on, .views button.on {
   background: var(--seg-on);
   font-weight: 600;
   color: var(--text);
@@ -226,14 +229,12 @@ h2 { margin: 0; font-size: 17px; font-weight: 600; }
 #theme[data-mode="light"] .i-moon { display: block; }
 
 @media (max-width: 720px) {
-  .topbar { flex-wrap: wrap; row-gap: 8px; }
-  .periods { order: 3; flex-basis: 100%; margin: 0; }
-  .year + .periods { margin: 0; }
   .search input { width: 140px; }
 }
 @media (max-width: 520px) {
-  .topbar { gap: 10px; }
-  .topbar-actions { margin-left: 0; } /* year select sits next to the buttons */
+  .topbar-row { gap: 10px; }
+  .views button { padding: 6px 12px; }
+  .brand-name { display: none; }
   .year select { height: 36px; }
 }
 
@@ -570,6 +571,69 @@ main {
 .sources tr.off td, .sources tr.off label span { opacity: .4; }
 .sources tr.unused td, .sources tr.unused label { opacity: .45; cursor: default; }
 
+/* ---------- subscriptions ---------- */
+
+.grp {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 18px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.grp:first-child { margin-top: 0; }
+.grp small { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; text-align: right; }
+.svc { border-top: 1px solid var(--hairline); }
+.grp + .svc { border-top: 0; }
+.svc summary {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  list-style: none;
+  cursor: pointer;
+}
+.svc summary::-webkit-details-marker { display: none; }
+.svc .main { min-width: 0; }
+.svc .title { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.svc .meta { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.svc .amt { font-weight: 600; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.svc .amt small { display: block; color: var(--muted); font-size: 11px; font-weight: 500; }
+.svc.st-stopped .title, .svc.st-stopped .amt, .svc.st-oneoff .amt { color: var(--muted); }
+.months { display: flex; gap: 3px; }
+.months i { width: 8px; height: 18px; border-radius: 3px; background: var(--grid); }
+.months i.paid { background: var(--accent); }
+.tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+.tag-new { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 40%, transparent); }
+.charges { margin: 0 0 10px 48px; padding: 0; list-style: none; font-size: 13px; }
+.charges li { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 4px 0; }
+.charges .amt { font-weight: 500; }
+#oneoffs { margin-top: 16px; }
+
+@media (max-width: 520px) {
+  .svc summary { grid-template-columns: 36px minmax(0, 1fr) auto; }
+  .svc .months { grid-column: 2 / -1; grid-row: 2; }
+  .months i { flex: 1; max-width: 14px; height: 10px; }
+  .charges { margin-left: 0; }
+  .charges li { grid-template-columns: 1fr auto; }
+  .charges li .muted { display: none; }
+}
+
 /* ---------- tooltip ---------- */
 
 .tip {
@@ -630,7 +694,9 @@ pre { overflow: auto; font-size: 12px; }
 }
 @media (max-width: 380px) {
   .bento { grid-template-columns: 1fr; }
-  .brand-name { display: none; }
+  .topbar-row, .topbar-actions { gap: 6px; }
+  .views button { padding: 6px 9px; font-size: 13px; }
+  .icon-btn { width: 34px; height: 34px; }
 }
 /* no hover on touch screens: tapping a month selects it instead */
 @media (hover: none) {

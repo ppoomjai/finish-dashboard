@@ -19,7 +19,12 @@
     category: ALL,
     limit: PAGE,
     catsOpen: { expense: false, income: false }, // show every category, not just the top ones
+    view: "dash",       // "dash" or "subs"
+    subsCats: ["Subscription", "Gym", "Domain & hosting"], // categories the Subscriptions view counts
+    oneOffsOpen: false, // one-off charges listed on the Subscriptions view
   };
+  // Categories offered on the Subscriptions view; the defaults above are switched on.
+  const SUB_CATS = ["Subscription", "Gym", "Domain & hosting", "Insurance", "Bills & Utilities", "Installment"];
   const TOP_CATS = 6;
 
   const ICONS = {
@@ -43,12 +48,15 @@
       state.excluded = new Set(p.excluded || []);
       $("hide-transfer").checked = p.hideTransfer ?? true;
       state.sourcesOpen = p.sourcesOpen ?? false;
+      if (p.view === "subs") state.view = "subs";
+      if (Array.isArray(p.subsCats)) state.subsCats = p.subsCats.filter((c) => SUB_CATS.includes(c));
     } catch {}
   }
   function savePrefs() {
     try {
       localStorage.setItem(PREFS, JSON.stringify({
         excluded: [...state.excluded], hideTransfer: $("hide-transfer").checked, sourcesOpen: state.sourcesOpen,
+        view: state.view, subsCats: state.subsCats,
       }));
     } catch {}
   }
@@ -129,9 +137,15 @@
   // ---------- render ----------
 
   function render() {
+    renderPeriods();
+    renderViews();
+    if (state.view === "subs") {
+      renderSubs();
+      savePrefs();
+      return;
+    }
     const scoped = state.txs.filter((tx) => inChannel(tx) && inPeriod(tx));
     const s = summarize(scoped);
-    renderPeriods();
     renderOverview(s);
     renderMonthly();
     renderCategories($("by-expense"), s.byExpense, "expense");
@@ -412,6 +426,140 @@
       setPeriod(state.period === th.dataset.month ? ALL : th.dataset.month)));
   }
 
+  // ---------- views ----------
+
+  function renderViews() {
+    const subs = state.view === "subs";
+    $("dash").hidden = subs;
+    $("subs").hidden = !subs;
+    $("views").querySelectorAll("button").forEach((b) => {
+      const on = b.dataset.view === state.view;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on);
+    });
+  }
+
+  // ---------- subscriptions ----------
+
+  // One service per merchant: drop "(21.40 USD)"-style notes, plan details in brackets
+  // and installment counters, so every month's charge lands on the same key.
+  const serviceName = (name) => String(name)
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b\d+\s*\/\s*\d+\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const serviceKey = (name) => serviceName(name).toUpperCase();
+
+  function addMonths(m, n) {
+    const [y, mo] = m.split("-").map(Number);
+    const d = new Date(y, mo - 1 + n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
+  // Services seen in the counted categories, judged as of the last month of the
+  // selected period: active = paid in 2+ months with the latest charge in that month or
+  // the one before; new = first seen that recently; stopped = recurring but not since.
+  function subscriptionServices() {
+    const scope = state.period === ALL ? visibleMonths() : visibleMonths().filter((m) => m <= state.period);
+    const asOf = [...scope].reverse().find((m) => !isEmpty(m)) || scope[scope.length - 1];
+    const recent = asOf ? [asOf, addMonths(asOf, -1)] : [];
+    const cats = new Set(state.subsCats);
+    const byKey = new Map();
+    for (const tx of state.txs) {
+      if (!inChannel(tx) || !cats.has(tx.category) || !scope.includes(tx.month)) continue;
+      const amount = (tx.out || 0) - (tx.in || 0);
+      if (Math.abs(amount) < 0.005) continue;
+      const key = serviceKey(tx.name) || tx.name;
+      if (!byKey.has(key)) byKey.set(key, { key, name: serviceName(tx.name) || tx.name, category: tx.category,
+        channels: new Set(), charges: [], byMonth: {} });
+      const s = byKey.get(key);
+      s.channels.add(tx.channel);
+      s.charges.push(tx);
+      s.byMonth[tx.month] = (s.byMonth[tx.month] || 0) + amount;
+    }
+    const services = [...byKey.values()].map((s) => {
+      s.charges.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      const months = Object.keys(s.byMonth).sort();
+      const last = s.charges[0];
+      // Typical monthly cost: average of the last three months it was paid in.
+      const lastThree = months.slice(-3).map((m) => s.byMonth[m]);
+      const monthly = lastThree.reduce((a, v) => a + v, 0) / lastThree.length;
+      const isRecent = recent.includes(months[months.length - 1]);
+      const status = months.length >= 2 ? (isRecent ? "active" : "stopped") : (isRecent ? "new" : "oneoff");
+      const total = months.reduce((a, m) => a + s.byMonth[m], 0);
+      return { ...s, months, last, monthly, status, total, category: last.category };
+    });
+    return { services, scope, asOf };
+  }
+
+  function renderSubs() {
+    const { services, scope, asOf } = subscriptionServices();
+    const live = services.filter((s) => s.status === "active" || s.status === "new").sort((a, b) => b.monthly - a.monthly);
+    const stopped = services.filter((s) => s.status === "stopped").sort((a, b) => String(b.last.date).localeCompare(String(a.last.date)));
+    const oneoff = services.filter((s) => s.status === "oneoff").sort((a, b) => b.total - a.total);
+
+    const runRate = live.reduce((a, s) => a + s.monthly, 0);
+    $("subs-label").textContent = "Recurring · per month" + (asOf ? ` · as of ${monthLabel(asOf, true)}` : "");
+    $("subs-monthly").textContent = baht(runRate);
+    $("subs-yearly").textContent = runRate ? `≈ ${baht(runRate * 12)} a year at this rate` : "";
+    $("subs-active").textContent = live.length;
+    const newOnes = live.filter((s) => s.status === "new").length;
+    $("subs-active-sub").textContent = [newOnes && `${newOnes} new`, stopped.length && `${stopped.length} stopped`]
+      .filter(Boolean).join(" · ");
+
+    const cats = new Set(state.subsCats);
+    const spent = state.txs.filter((tx) => inChannel(tx) && inPeriod(tx) && cats.has(tx.category))
+      .reduce((a, tx) => a + (tx.out || 0) - (tx.in || 0), 0);
+    $("subs-spent-label").textContent = "Spent · " +
+      (state.period !== ALL ? monthLabel(state.period, true) : state.year === ALL ? "All time" : state.year);
+    $("subs-spent").textContent = baht(spent);
+    const n = state.period === ALL ? monthsWithData().length : 1;
+    $("subs-spent-sub").textContent = n > 1 ? baht(spent / n) + " / month avg" : "";
+
+    $("subs-cats").innerHTML = SUB_CATS.map((c) =>
+      `<button class="chip${cats.has(c) ? " chip-active" : ""}" data-cat="${esc(c)}" aria-pressed="${cats.has(c)}">${icon(c)} ${esc(c)}</button>`).join("");
+    $("subs-cats").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      const c = b.dataset.cat;
+      state.subsCats = cats.has(c) ? state.subsCats.filter((x) => x !== c) : [...state.subsCats, c];
+      render();
+    }));
+
+    // Up to the last 12 months of the scope, as a strip of paid / not paid cells.
+    const strip = scope.slice(-12);
+    const row = (s) => {
+      const peak = Math.max(...strip.map((m) => s.byMonth[m] || 0), 1);
+      const cells = strip.map((m) => {
+        const v = s.byMonth[m];
+        return `<i class="${v ? "paid" : ""}" style="${v ? `opacity:${(0.35 + 0.65 * v / peak).toFixed(2)}` : ""}"` +
+          ` title="${monthLabel(m, true)}: ${v ? baht(v, 2) : "–"}"></i>`;
+      }).join("");
+      const badge = s.status === "new" ? '<span class="tag tag-new">new</span>'
+        : s.status === "stopped" ? '<span class="tag">stopped</span>' : "";
+      const charges = s.charges.slice(0, 24).map((tx) =>
+        `<li><span>${esc(dayLabel(tx.date))}</span><span class="muted">${esc(tx.channel)}</span><span class="amt">${baht((tx.out || 0) - (tx.in || 0), 2)}</span></li>`).join("");
+      return `<details class="svc st-${s.status}">
+        <summary>
+          <span class="ico" aria-hidden="true">${icon(s.category)}</span>
+          <span class="main"><span class="title">${esc(s.name)} ${badge}</span>
+            <span class="meta">${esc(s.category)} · ${esc([...s.channels].join(", "))} · last ${esc(dayLabel(s.last.date))}</span></span>
+          <span class="months" aria-hidden="true">${cells}</span>
+          <span class="amt">${baht(s.monthly)}<small>${s.status === "oneoff" ? "once" : "/ mo"}</small></span>
+        </summary>
+        <ul class="charges">${charges}</ul>
+      </details>`;
+    };
+    const group = (title, list, note) => list.length
+      ? `<h3 class="grp">${title} <span class="count">${list.length}</span>${note ? `<small class="muted">${note}</small>` : ""}</h3>` + list.map(row).join("")
+      : "";
+    let html = group("Active", live, "") + group("Stopped", stopped, "recurring before, nothing in the last two months");
+    if (oneoff.length) {
+      html += `<button class="more" id="oneoffs">${state.oneOffsOpen ? "Hide" : "Show"} ${oneoff.length} one-off charge${oneoff.length > 1 ? "s" : ""}</button>`;
+      if (state.oneOffsOpen) html += group("One-off", oneoff, "paid once in this period");
+    }
+    $("subs-list").innerHTML = html || '<p class="empty">Nothing in these categories for this period.</p>';
+    $("oneoffs")?.addEventListener("click", () => { state.oneOffsOpen = !state.oneOffsOpen; render(); });
+  }
+
   // ---------- tooltip ----------
 
   function showTip(e, html) {
@@ -443,10 +591,9 @@
       $("year").value = state.year;
 
       $("signin").hidden = true;
-      $("periods").hidden = false;
-      $("year-wrap").hidden = false;
+      $("views").hidden = false;
+      $("filters").hidden = false;
       $("reload").hidden = false;
-      $("dash").hidden = false;
       render();
     } finally {
       $("reload").classList.remove("spin");
@@ -456,8 +603,9 @@
   function showError(e) {
     $("signin").hidden = false;
     $("dash").hidden = true;
-    $("periods").hidden = true;
-    $("year-wrap").hidden = true;
+    $("subs").hidden = true;
+    $("views").hidden = true;
+    $("filters").hidden = true;
     $("reload").hidden = true;
     $("connect").hidden = false;
     $("status").textContent = e.message === "Not signed in"
@@ -489,6 +637,12 @@
   $("hide-transfer").addEventListener("change", update);
   $("clear-cat").addEventListener("click", () => { state.category = ALL; update(); });
   $("more").addEventListener("click", () => { state.limit += PAGE; render(); });
+  $("views").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    if (state.view === b.dataset.view) return;
+    state.view = b.dataset.view;
+    window.scrollTo(0, 0);
+    render();
+  }));
 
   restorePrefs();
   // Still signed in from earlier (token not expired): load straight away.
